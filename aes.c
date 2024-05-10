@@ -2,14 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "wmmintrin.h"
-#include "mycrypto.h"
 
 #define U8TO32_STRIDE4(x) ( (((uint32_t)((x)[12]))<<24) | (((uint32_t)((x)[8]))<<16)  | (((uint32_t)((x)[4]) << 8)) | ((uint32_t)((x)[0])) )
 #define ROTR32(x, n) (( x>>n  ) | (x<<(32-n)))
 #define ROTL32(x, n) (( x<<n  ) | (x>>(32-n)))
 
 // 1.1 使用普通C语言实现的AES128
-const unsigned char S_box[256] = {
+const uint8_t S_box[256] = {
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
     0xB7, 0xFD, 0x93, 0x26, 0x36, 0x3F, 0xF7, 0xCC, 0x34, 0xA5, 0xE5, 0xF1, 0x71, 0xD8, 0x31, 0x15,
@@ -27,7 +26,7 @@ const unsigned char S_box[256] = {
     0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 };
-const unsigned char inv_S_box[256] = {
+const uint8_t inv_S_box[256] = {
     0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E, 0x81, 0xF3, 0xD7, 0xFB,
     0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87, 0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB,
     0x54, 0x7B, 0x94, 0x32, 0xA6, 0xC2, 0x23, 0x3D, 0xEE, 0x4C, 0x95, 0x0B, 0x42, 0xFA, 0xC3, 0x4E,
@@ -45,7 +44,7 @@ const unsigned char inv_S_box[256] = {
     0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D
 };
-const unsigned char Rcon[11] =  {0, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
+const uint8_t Rcon[11] =  {0, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
 
 static inline uint8_t GMul8(uint8_t u, uint8_t v) {
     uint8_t p = 0;
@@ -96,10 +95,10 @@ static inline void _mix_columns(uint8_t* state)
 
     for(int i=0;i<4;i++)
     {
-        state[i*4] =    GMul8(0x02, tmp[i]) ^ GMul8(0x03, tmp[i+4]) ^ tmp[i+8]             ^ tmp[i+12];
-        state[i*4+1]  = tmp[i]             ^ GMul8(0x02, tmp[i+4]) ^ GMul8(0x03, tmp[i+8]) ^ tmp[i+12];
-        state[i*4+2]  = tmp[i]             ^ tmp[i+4]             ^ GMul8(0x02, tmp[i+8]) ^ GMul8(0x03, tmp[i+12]);
-        state[i*4+3] =  GMul8(0x03, tmp[i]) ^ tmp[i+4]             ^ tmp[i+8]             ^ GMul8(0x02, tmp[i+12]);
+        state[i*4]    = GMul8(0x02, tmp[i]) ^ GMul8(0x03, tmp[i+4]) ^ tmp[i+8]              ^ tmp[i+12];
+        state[i*4+1]  = tmp[i]              ^ GMul8(0x02, tmp[i+4]) ^ GMul8(0x03, tmp[i+8]) ^ tmp[i+12];
+        state[i*4+2]  = tmp[i]              ^ tmp[i+4]              ^ GMul8(0x02, tmp[i+8]) ^ GMul8(0x03, tmp[i+12]);
+        state[i*4+3]  = GMul8(0x03, tmp[i]) ^ tmp[i+4]              ^ tmp[i+8]              ^ GMul8(0x02, tmp[i+12]);
     }
 }
 
@@ -122,14 +121,14 @@ static inline void _inv_mix_columns(uint8_t* state)
     for(int i=0;i<4;i++)
     {
         int base = i*4;
-        state[i] =    GMul8(0x0e, tmp[base]) ^ GMul8(0x0b, tmp[base+1]) ^ GMul8(0x0d, tmp[base+2]) ^ GMul8(0x09, tmp[base+3]);
+        state[i]    = GMul8(0x0e, tmp[base]) ^ GMul8(0x0b, tmp[base+1]) ^ GMul8(0x0d, tmp[base+2]) ^ GMul8(0x09, tmp[base+3]);
         state[i+4]  = GMul8(0x09, tmp[base]) ^ GMul8(0x0e, tmp[base+1]) ^ GMul8(0x0b, tmp[base+2]) ^ GMul8(0x0d, tmp[base+3]);
         state[i+8]  = GMul8(0x0d, tmp[base]) ^ GMul8(0x09, tmp[base+1]) ^ GMul8(0x0e, tmp[base+2]) ^ GMul8(0x0b, tmp[base+3]);
-        state[i+12] =  GMul8(0x0b, tmp[base]) ^ GMul8(0x0d, tmp[base+1]) ^ GMul8(0x09, tmp[base+2]) ^ GMul8(0x0e, tmp[base+3]);
+        state[i+12] = GMul8(0x0b, tmp[base]) ^ GMul8(0x0d, tmp[base+1]) ^ GMul8(0x09, tmp[base+2]) ^ GMul8(0x0e, tmp[base+3]);
     }
 }
 
-void AES128_Loadkey_naive(const uint8_t* key, uint8_t (*key_schedule)[16])
+void AES128_KeyExpd_naive(const uint8_t* key, uint8_t (*key_schedule)[16])
 {
     memcpy(key_schedule[0], key, 16);
 
@@ -159,14 +158,14 @@ void AES128_Encrypt_naive(const uint8_t* plaintext, const uint8_t (*key_schedule
         _xor_key(ciphertext, key_schedule[i]);
     }
     _sub_bytes(ciphertext);
-    _shift_rows(ciphertext); _transpose_4x4(ciphertext); // 本代码实现_shift_rows、_mix_columns操作均会发生一次转置，故需这里需要加一次转置
+    _shift_rows(ciphertext); _transpose_4x4(ciphertext); // 本代码实现的_shift_rows、_mix_columns操作均会发生一次转置，故需这里需要加一次转置
     _xor_key(ciphertext, key_schedule[10]);
 }
 void AES128_Decrypt_naive(const uint8_t* ciphertext, const uint8_t (*key_schedule)[16], uint8_t* plaintext)
 {
     memcpy(plaintext, ciphertext, 16);
 
-    _xor_key(plaintext, key_schedule[10]); _transpose_4x4(plaintext); // 本代码实现_inv_shift_rows、_inv_mix_columns操作均会发生一次转置，故需这里需要加一次转置
+    _xor_key(plaintext, key_schedule[10]); _transpose_4x4(plaintext); // 本代码实现的_inv_shift_rows、_inv_mix_columns操作均会发生一次转置，故需这里需要加一次转置
     for(int i=9;i>0;i--)
     {
         _inv_sub_bytes(plaintext);
@@ -191,7 +190,7 @@ static inline __m128i _keygen(__m128i key, __m128i keygened)
     return _mm_xor_si128(key, keygened);
 }
 
-void AES128_Loadkey_x86(const uint8_t *key, __m128i* key_schedule)
+void AES128_KeyExpd_x86(const uint8_t *key, __m128i* key_schedule)
 {
     // 加密轮密钥
     key_schedule[0] = _mm_loadu_si128((const __m128i*) key);
