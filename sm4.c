@@ -4,7 +4,6 @@
 
 #define U8TO32(b0, b1, b2, b3) ( ((uint32_t)(b0)) | (((uint32_t)(b1))<<8) | (((uint32_t)(b2))<<16) | (((uint32_t)(b3))<<24) )
 #define U32TO8(U32, U8P) {(U8P)[3]=(uint8_t)(U32); (U8P)[2]=(uint8_t)((U32)>>8); (U8P)[1]=(uint8_t)((U32)>>16); (U8P)[0]=(uint8_t)((U32)>>24);}
-#define ROTR32(x, n) (( x>>n  ) | (x<<(32-n)))
 #define ROTL32(x, n) (( x<<n  ) | (x>>(32-n)))
 
 const uint32_t CK[32] = {
@@ -17,7 +16,6 @@ const uint32_t CK[32] = {
     0xA0A7AEB5, 0xBCC3CAD1, 0xD8DFE6ED, 0xF4FB0209,
     0x10171E25, 0x2C333A41, 0x484F565D, 0x646B7279
 };
-const uint32_t FK[4] = {0xA3B1BAC6, 0x56AA3350, 0X677D9197, 0XB27022DC};
 const uint8_t S_box[256] = {
 	0xD6,0x90,0xE9,0xFE,0xCC,0xE1,0x3D,0xB7,0x16,0xB6,0x14,0xC2,0x28,0xFB,0x2C,0x05,
 	0x2B,0x67,0x9A,0x76,0x2A,0xBE,0x04,0xC3,0xAA,0x44,0x13,0x26,0x49,0x86,0x06,0x99,
@@ -60,10 +58,10 @@ static inline uint32_t _round_func_key_expd(uint32_t k0, uint32_t k1, uint32_t k
 
 void SM4_KeyExpd_naive(const uint8_t* key, uint32_t* key_schedule)
 {
-    uint32_t k0=U8TO32(key[3], key[2], key[1], key[0]) ^ FK[0], 
-             k1=U8TO32(key[7], key[6], key[5], key[4]) ^ FK[1],
-             k2=U8TO32(key[11], key[10], key[9], key[8]) ^ FK[2],
-             k3=U8TO32(key[15], key[14], key[13], key[12]) ^ FK[3], tmp;
+    uint32_t k0=U8TO32(key[3], key[2], key[1], key[0]) ^ 0xA3B1BAC6, 
+             k1=U8TO32(key[7], key[6], key[5], key[4]) ^ 0x56AA3350,
+             k2=U8TO32(key[11], key[10], key[9], key[8]) ^ 0X677D9197,
+             k3=U8TO32(key[15], key[14], key[13], key[12]) ^ 0XB27022DC, tmp;
     for(int i=0; i<32; i++)
     {
         tmp = _round_func_key_expd(k0, k1, k2, k3, CK[i]);

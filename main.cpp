@@ -2,8 +2,19 @@
 #include <cstring>
 #include <sys/time.h>
 #include "mycrypto.h"
+#include "myhash.h"
 
 #define TIME_REP 10000
+#define TIMING(code, result) \
+        {\
+            double st=gtd();\
+            for(int i=0; i<TIME_REP; i++)\
+            {\
+                code\
+            }\
+            double et=gtd();\
+            result = (et-st)/TIME_REP;\
+        }\
 
 
 double gtd(){
@@ -13,54 +24,38 @@ double gtd(){
 }
 
 int main()
-{   
-    double st0, et0, st1, et1, st2, et2;
-
-    unsigned char pt[] = "Two One Nine Two";
-    unsigned char key[] = "Thats my Kung Fu";
-    printf("Plain text: %s\nKey: %s\n", pt, key);
-
+{
     // AES128 naive
+    unsigned char pt_aes[] = "I want to sleep!";
+    unsigned char key_aes[] = "I want to sleep!";
     uint8_t ct_naive[17] = {0};
     uint8_t dt_naive[17] = {0};
     uint8_t key_schedule_naive[11][16] = {0};
+    double lapse_aes128_naive_keygen, lapse_aes128_naive_enc, lapse_aes128_naive_dec;
+    TIMING(AES128_KeyExpd_naive(key_aes, key_schedule_naive);, lapse_aes128_naive_keygen)
+    TIMING(AES128_Encrypt_naive(pt_aes, key_schedule_naive, ct_naive);, lapse_aes128_naive_enc)
+    TIMING(AES128_Decrypt_naive(ct_naive, key_schedule_naive, dt_naive);, lapse_aes128_naive_dec)
     
-
-    st0 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_KeyExpd_naive(key, key_schedule_naive);
-    et0 = gtd();
-    st1 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_Encrypt_naive(pt, key_schedule_naive, ct_naive);
-    et1 = gtd();
-    st2 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_Decrypt_naive(ct_naive, key_schedule_naive, dt_naive);
-    et2 = gtd();
-    
-    printf("\n[AES128-naive]: \n");
-    printf("timeing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", (et0-st0)/TIME_REP, (et1-st1)/TIME_REP, (et2-st2)/TIME_REP);
+    printf("[AES128-naive]: \n");
+    printf("timing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", lapse_aes128_naive_keygen, lapse_aes128_naive_enc, lapse_aes128_naive_dec);
+    printf("plaintext: %s\n", pt_aes);
     printf("ciphertext: "); for(int i=0;i<16;i++) printf("%02x ", ct_naive[i]); putchar('\n');
     printf("decrypttext: %s\n", dt_naive);
 
-
     // AES128 x86 AES-NI
-    unsigned char ct[17] = {0};
-    unsigned char dt[17] = {0};
+    unsigned char ct_x86[17] = {0};
+    unsigned char dt_x86[17] = {0};
     __m128i key_schedule[20];
-
-    st0 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_KeyExpd_x86(key, key_schedule);
-    et0 = gtd();
-    st1 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_Encrypt_x86(pt, key_schedule, ct); 
-    et1 = gtd();
-    st2 = gtd();
-    for(int i=0;i<TIME_REP;i++) AES128_Decrypt_x86(ct, key_schedule, dt);
-    et2 = gtd();
+    double lapse_aes128_x86_keygen, lapse_aes128_x86_enc, lapse_aes128_x86_dec;
+    TIMING(AES128_KeyExpd_x86(key_aes, key_schedule);, lapse_aes128_x86_keygen)
+    TIMING(AES128_Encrypt_x86(pt_aes, key_schedule, ct_x86);, lapse_aes128_x86_enc)
+    TIMING(AES128_Decrypt_x86(ct_x86, key_schedule, dt_x86);, lapse_aes128_x86_dec)
     
     printf("\n[AES128-x86]: \n");
-    printf("timeing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", (et0-st0)/TIME_REP, (et1-st1)/TIME_REP, (et2-st2)/TIME_REP);
-    printf("ciphertext: "); for(int i=0;i<16;i++) printf("%02x ", ct[i]); putchar('\n');
-    printf("decrypttext: %s\n", dt);
+    printf("timing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", lapse_aes128_x86_keygen, lapse_aes128_x86_enc, lapse_aes128_x86_dec);
+    printf("plaintext: %s\n", pt_aes);
+    printf("ciphertext: "); for(int i=0;i<16;i++) printf("%02x ", ct_x86[i]); putchar('\n');
+    printf("decrypttext: %s\n", dt_x86);
 
 
     // SM4 naive
@@ -70,23 +65,38 @@ int main()
     unsigned char ct_sm4[17] = {0};
     unsigned char dt_sm4[17] = {0};
     uint32_t key_schedule_sm4[32];
-
-    st0 = gtd();
-    for(int i=0;i<TIME_REP;i++) SM4_KeyExpd_naive(key_sm4, key_schedule_sm4);
-    et0 = gtd();
-    st1 = gtd();
-    for(int i=0;i<TIME_REP;i++) SM4_Encrypt_naive(pt_sm4, key_schedule_sm4, ct_sm4); 
-    et1 = gtd();
-    st2 = gtd();
-    for(int i=0;i<TIME_REP;i++) SM4_Decrypt_naive(ct_sm4, key_schedule_sm4, dt_sm4);
-    et2 = gtd();
+    double lapse_sm4_keygen, lapse_sm4_enc, lapse_sm4_dec;
+    TIMING(SM4_KeyExpd_naive(key_sm4, key_schedule_sm4);, lapse_sm4_keygen)
+    TIMING(SM4_Encrypt_naive(pt_sm4, key_schedule_sm4, ct_sm4);, lapse_sm4_enc)
+    TIMING(SM4_Decrypt_naive(ct_sm4, key_schedule_sm4, dt_sm4);, lapse_sm4_dec)
 
     printf("\n[SM4-naive]: \n");
-    printf("timeing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", (et0-st0)/TIME_REP, (et1-st1)/TIME_REP, (et2-st2)/TIME_REP);
+    printf("timing(kengen,enc,dec)(ms): %.9lf, %.9lf, %.9lf\n", lapse_sm4_keygen, lapse_sm4_enc, lapse_sm4_dec);
     printf("ciphertext: "); for(int i=0; i<16; i++) printf("%x ", ct_sm4[i]); putchar('\n');
-    printf("SM4 Encrypt Check: %s\n", strcmp((char*)ct_sm4_ref, (char*)ct_sm4) ? "Fail" : "Pass");
+    printf("EncryptCheck: %s\n", strcmp((char*)ct_sm4_ref, (char*)ct_sm4) ? "Fail" : "Pass");
     printf("decrypttext: "); for(int i=0; i<16; i++) printf("%02x ", dt_sm4[i]); putchar('\n');
-    printf("SM4 Decrypt Check: %s\n", strcmp((char*)pt_sm4, (char*)dt_sm4) ? "Fail" : "Pass");
+    printf("DecryptCheck: %s\n", strcmp((char*)pt_sm4, (char*)dt_sm4) ? "Fail" : "Pass");
+
+
+
+    // SHA3 256 & 512 naive
+    unsigned char sha3_msg[] = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    uint8_t hash_sha3_256[32];
+    double lapse_sha3_256;
+    TIMING(SHA3_256_naive(56, sha3_msg, hash_sha3_256);, lapse_sha3_256)
+    uint8_t hash_sha3_512[64];
+    double lapse_sha3_512;
+    TIMING(SHA3_512_naive(56, sha3_msg, hash_sha3_512);, lapse_sha3_512)
+
+    printf("\n[SHA3]: \n");
+    printf("timing(sha3-256)(ms): %.9lf\n", lapse_sha3_256);
+    printf("timing(sha3-512)(ms): %.9lf\n", lapse_sha3_512);
+    printf("SHA3-256 hash(true): %s\n", "41c0dba2a9d62408 49100376a8235e2c 82e1b9998a999e21 db32dd97496d3376");
+    printf("SHA3-256 hash: "); for(int i=0; i<32; i++){printf("%02x", hash_sha3_256[i]); if(i%8==7) printf(" ");} putchar('\n');
+    printf("SHA3-512 hash(true): %s\n", "04a371e84ecfb5b8 b77cb48610fca818 2dd457ce6f326a0f d3d7ec2f1e91636d ee691fbe0c985302 ba1b0d8dc78c0863 46b533b49c030d99 a27daf1139d6e75e");
+    printf("SHA3-512 hash: "); for(int i=0; i<64; i++){printf("%02x", hash_sha3_512[i]); if(i%8==7) printf(" ");} putchar('\n');
+
+    
 
 
     return 0;
