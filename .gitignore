@@ -1,4 +1,4 @@
-# # obj & bin
+# obj & bin
 obj/*
 bin/*
 
@@ -34,3 +34,7 @@ bin/*
 *.exe
 *.out
 *.app
+
+# IDEs
+.vscode/
+.idea/

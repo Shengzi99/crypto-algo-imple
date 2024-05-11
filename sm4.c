@@ -51,7 +51,7 @@ static inline uint32_t _round_func_key_expd(uint32_t k0, uint32_t k1, uint32_t k
     uint32_t permu_T = k1 ^ k2 ^ k3 ^ ck;
     // Nonlinear transformation τ
     permu_T = U8TO32(S_box[(uint8_t)(permu_T)], S_box[(uint8_t)(permu_T>>8)], S_box[(uint8_t)(permu_T>>16)], S_box[(uint8_t)(permu_T>>24)]);
-    // Linear transformation L
+    // Linear transformation L'
     permu_T = permu_T ^ ROTL32(permu_T, 13) ^ ROTL32(permu_T, 23);
     return k0 ^ permu_T;
 }

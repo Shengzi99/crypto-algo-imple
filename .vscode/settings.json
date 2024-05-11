@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "cstdio": "cpp",
-        "x86intrin.h": "c",
-        "wmmintrin.h": "c",
-        "stddef.h": "c"
-    }
-}

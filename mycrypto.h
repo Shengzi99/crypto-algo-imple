@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "wmmintrin.h"
 
+
 // AES128 naive C implementation
 void AES128_KeyExpd_naive(const uint8_t* key, uint8_t (*key_schedule)[16]);
 void AES128_Encrypt_naive(const uint8_t* plaintext, const uint8_t (*key_schedule)[16], uint8_t* ciphertext);

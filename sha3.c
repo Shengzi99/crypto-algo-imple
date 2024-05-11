@@ -27,7 +27,7 @@ static const int RHOPI_IDX[24] = {
 };
 
 
-static inline void _keccak_p_1600_24(uint64_t *state)
+static inline void _keccak_p_1600_24_naive(uint64_t *state)
 {
     for(int rnd=0; rnd<24; rnd++)
     {
@@ -62,34 +62,32 @@ static inline void _keccak_p_1600_24(uint64_t *state)
         // iota()
         state[0] ^= RND_CONST[rnd];
     }
-
 }
 
 static inline void _SHA3_naive(size_t msg_size, const uint8_t* msg, uint8_t* hash, int hash_bits)
 {
-    // keccak params
+    // sponge func params
     size_t c_size = 2 * (hash_bits>>3), 
            r_size = 200 - c_size, 
            n_iter = (msg_size / r_size) + 1,
-           msg_ptr = 0;
+           msg_idx = 0;
     uint64_t state[25] = {0};
 
     // sponge iter
     for(size_t it=0; it<(n_iter-1); it++)
     {
-        for(size_t i=0; i<(r_size>>3); i++) state[i] ^= ((uint64_t*)(msg+msg_ptr))[i];
-        _keccak_p_1600_24(state);
-        msg_ptr += r_size;
+        for(size_t i=0; i<(r_size>>3); i++) state[i] ^= ((uint64_t*)(msg+msg_idx))[i];
+        _keccak_p_1600_24_naive(state);
+        msg_idx += r_size;
     }
-
     // sponge last iter
     uint8_t* state_byte_ptr = ((uint8_t*)state);
-    while(msg_ptr<msg_size)
-        *(state_byte_ptr++) ^= msg[msg_ptr++];
+    while(msg_idx<msg_size) 
+        *(state_byte_ptr++) ^= msg[msg_idx++];
     // concat '01' & pad10*1
     *state_byte_ptr ^= 0x06;
     ((uint8_t*)state)[r_size-1] ^= 0x80;
-    _keccak_p_1600_24(state);    
+    _keccak_p_1600_24_naive(state);
 
     // trunc hash
     for (int i=0; i<(hash_bits>>3); i++)
