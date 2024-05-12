@@ -6,6 +6,8 @@
 #define U8TO32_STRIDE4(x) ( (((uint32_t)((x)[12]))<<24) | (((uint32_t)((x)[8]))<<16)  | (((uint32_t)((x)[4]) << 8)) | ((uint32_t)((x)[0])) )
 #define ROTR32(x, n) (( x>>n  ) | (x<<(32-n)))
 #define ROTL32(x, n) (( x<<n  ) | (x>>(32-n)))
+#define K1(key) ((key))
+#define K2(key) ((key)+16)
 
 // 1.1 使用普通C语言实现的AES128
 const uint8_t S_box[256] = {
@@ -253,3 +255,153 @@ void AES128_Decrypt_x86(const uint8_t* ciphertext, const __m128i* key_schedule, 
 // void AES_Encrypt_armv8(const uint8_t* plaintext, const uint8_t* key, uint8_t* ciphertext)
 // {
 // }
+
+
+
+// 2.1 XTS-AES 128 naive C
+
+static inline void GMul128(uint8_t *T)
+{
+    uint8_t Cin=0, Cout;
+    for (size_t j=0; j<16; j++)
+    {
+        Cout = (T[j] >> 7) & 1;
+        T[j] = ((T[j] << 1) + Cin) & 0xFF;
+        Cin = Cout;
+    }
+    if (Cout) T[0] ^= 0x87;
+}
+
+void XTS_AES128_Encrypt_naive(const uint8_t* pt, const size_t pt_size, const uint64_t seq_num, const uint8_t* key, uint8_t* ct)
+{   
+    uint8_t T_iv[16]={0}, T[16];
+    uint8_t key1_schedule[11][16], key2_schedule[11][16];
+    uint8_t CC[16], PP[16];
+
+    // init key schedule
+    AES128_KeyExpd_naive(K1(key), key1_schedule);
+    AES128_KeyExpd_naive(K2(key), key2_schedule);
+    // init tweak T
+    ((uint64_t*)T_iv)[0] = seq_num;
+    AES128_Encrypt_naive(T_iv, key2_schedule, T);
+
+    // Enc full blocks
+    size_t blk_idx;
+    for(blk_idx=0; blk_idx<(pt_size/16*16); blk_idx+=16)
+    {
+        // CC = pt ⊕ T
+        for(int j=0; j<16; j++) CC[j] = (pt+blk_idx)[j] ^ T[j];
+        // PP = Enc(CC)
+        AES128_Encrypt_naive(CC, key1_schedule, PP);
+        // ct = PP ⊕ T
+        for(int j=0; j<16; j++) (ct+blk_idx)[j] = PP[j] ^ T[j];
+        // T ⊗= α
+        GMul128(T);
+    }
+    if(blk_idx==pt_size) return;
+
+    // Enc last (partial) block
+    for(int j=0; j<16; j++)
+    {
+        if(blk_idx+j < pt_size)
+        {
+            (ct+blk_idx)[j] = (ct+blk_idx-16)[j];
+            CC[j] = (pt+blk_idx)[j] ^ T[j];
+        }
+        else
+            CC[j] = (ct+blk_idx-16)[j] ^ T[j];
+    }
+    AES128_Encrypt_naive(CC, key1_schedule, PP);               // PP = Enc(CC)
+    for(int j=0; j<16; j++) (ct+blk_idx-16)[j] = PP[j] ^ T[j]; // ct_m-1 = PP ⊕ T
+}
+
+
+
+void XTS_AES128_Decrypt_naive(const uint8_t* ct, const size_t ct_size, const uint64_t seq_num, const uint8_t* key, uint8_t* pt)
+{
+    uint8_t T_iv[16]={0}, T[16], T_m_1[16];
+    uint8_t key1_schedule[11][16], key2_schedule[11][16];
+    uint8_t CC[16], PP[16];
+
+    // init key schedule
+    AES128_KeyExpd_naive(K1(key), key1_schedule);
+    AES128_KeyExpd_naive(K2(key), key2_schedule);
+    // init tweak T
+    ((uint64_t*)T_iv)[0] = seq_num;
+    AES128_Encrypt_naive(T_iv, key2_schedule, T);
+
+    // Dec full blocks
+    size_t blk_idx;
+    for(blk_idx=0; blk_idx<(ct_size/16*16); blk_idx+=16)
+    {
+        // CC = ct ⊕ T
+        for(int j=0; j<16; j++) CC[j] = (ct+blk_idx)[j] ^ T[j];
+        // PP = Dec(CC)
+        AES128_Decrypt_naive(CC, key1_schedule, PP);
+        // ct = PP ⊕ T
+        for(int j=0; j<16; j++) (pt+blk_idx)[j] = PP[j] ^ T[j];
+        // T ⊗= α
+        GMul128(T);
+    }
+    if(blk_idx==ct_size) return;
+
+    // Dec block before last
+    for(int j=0; j<16; j++) CC[j] = (ct+blk_idx-16)[j] ^ T[j]; // CC = ct ⊕ T
+    AES128_Decrypt_naive(CC, key1_schedule, PP);               // PP = Dec(CC)
+    for(int j=0; j<16; j++) (pt+blk_idx-16)[j] = PP[j] ^ T[j]; // ct = PP ⊕ T
+
+    // Dec last (partial) block
+    memset(T_iv, 0, 16);
+    ((uint64_t*)T_iv)[0] = seq_num+(ct_size/16)-1;
+    AES128_Encrypt_naive(T_iv, key2_schedule, T_m_1);
+
+    for(int j=0; j<16; j++)
+    {
+        if(blk_idx+j < ct_size)
+        {
+            (pt+blk_idx)[j] = (pt+blk_idx-16)[j];
+            CC[j] = (ct+blk_idx)[j] ^ T_m_1[j];
+        }
+        else
+            CC[j] = (pt+blk_idx-16)[j] ^ T_m_1[j];
+    }
+    AES128_Decrypt_naive(CC, key1_schedule, PP);               // PP = Dec(CC)
+    for(int j=0; j<16; j++) (pt+blk_idx-16)[j] = PP[j] ^ T_m_1[j]; // pt_m-1 = PP ⊕ T
+}
+
+
+// int main(){
+
+//     // // AES-XTS文档Vector 17
+//     unsigned char pt[19] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12};
+//     unsigned char ct[19]={0};
+//     unsigned char dt[32]={0};
+//     unsigned char ct_ref[19]={0xe5, 0xdf, 0x13, 0x51, 0xc0, 0x54, 0x4b, 0xa1, 0x35, 0x0b, 0x33, 0x63, 0xcd, 0x8e, 0xf4, 0xbe, 0xed, 0xbf, 0x9d};
+//     uint8_t key[32] = {0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+//                        0xbf, 0xbe, 0xbd, 0xbc, 0xbb, 0xba, 0xb9, 0xb8, 0xb7, 0xb6, 0xb5, 0xb4, 0xb3, 0xb2, 0xb1, 0xb0};
+//     uint64_t seq_num = 0x9a78563412;
+//     size_t msg_size = 19;
+
+
+//     // // AES-XTS文档Vector 3
+//     // unsigned char pt[32] = {0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44,
+//     //                         0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44};
+//     // unsigned char ct[32]={0};
+//     // unsigned char ct_ref[32]={0xaf, 0x85, 0x33, 0x6b, 0x59, 0x7a, 0xfc, 0x1a, 0x90, 0x0b, 0x2e, 0xb2, 0x1e, 0xc9, 0x49, 0xd2,
+//     //                           0x92, 0xdf, 0x4c, 0x04, 0x7e, 0x0b, 0x21, 0x53, 0x21, 0x86, 0xa5, 0x97, 0x1a, 0x22, 0x7a, 0x89};
+//     // unsigned char dt[32]={0};
+//     // uint8_t key[32] = {0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+//     //                    0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22};
+//     // uint64_t seq_num = 0x3333333333;
+//     // size_t msg_size = 32;
+
+    
+//     XTS_AES128_Encrypt_naive(pt, msg_size, seq_num, key, ct);
+//     XTS_AES128_Decrypt_naive(ct, msg_size, seq_num, key, dt);
+//     for(int i=0;i<msg_size;i++) printf("%02x ", ct[i]); putchar('\n');
+//     for(int i=0;i<msg_size;i++) printf("%02x ", ct_ref[i]); putchar('\n');
+//     for(int i=0;i<msg_size;i++) printf("%02x ", dt[i]); putchar('\n');
+//     // for(int i=0;i<32;i++) printf("0x44, "); putchar('\n');
+//     // char cc[] = "e5df1351c0544ba1350b3363cd8ef4beedbf9d";
+//     // for(int i=0;i<19;i++) {printf("0x%c%c, ", cc[i*2], cc[i*2+1]);}
+// }   

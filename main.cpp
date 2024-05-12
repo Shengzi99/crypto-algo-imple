@@ -4,7 +4,7 @@
 #include "mycrypto.h"
 #include "myhash.h"
 
-#define TIME_REP 1000000
+#define TIME_REP 100000
 #define TIMING(code, result) \
         {\
             double st=gtd();\
@@ -87,7 +87,7 @@ int main()
     double lapse_sha3_512;
     TIMING(SHA3_512_naive(56, sha3_msg, hash_sha3_512);, lapse_sha3_512)
 
-    printf("\n[SHA3]: \n");
+    printf("\n[SHA3-naive]: \n");
     printf("timing(sha3-256)(ms): %.9lf\n", lapse_sha3_256);
     printf("timing(sha3-512)(ms): %.9lf\n", lapse_sha3_512);
     printf("SHA3-256 hash(reference): %s\n", "41c0dba2a9d62408 49100376a8235e2c 82e1b9998a999e21 db32dd97496d3376");
@@ -97,15 +97,37 @@ int main()
 
     
     // SM3 naive
-    unsigned char sm3_msg[] = "I want to sleep! I want to sleep! I want to sleep! I want to sleep!";
+    unsigned char sm3_msg[] = "I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep! I want to sleep!";
     uint8_t hash_sm3[32];
     double lapse_sm3;
-    TIMING(SM3_256_naive(67, sm3_msg, hash_sm3);, lapse_sm3)
+    TIMING(SM3_256_naive(271, sm3_msg, hash_sm3);, lapse_sm3)
 
-    printf("\n[SM3]: \n");
+    printf("\n[SM3-naive]: \n");
     printf("timing(ms): %.9lf\n", lapse_sm3);
-    printf("SM3 hash(reference): %s\n", "22D3A922 E74B3E23 E859D9D4 A9F4B436 FF63DA98 5E2AA6EB 00AA8CDA 4B6786B5");
+    printf("SM3 hash(reference): %s\n", "2F7274F4 D8337FD6 8C940FAF 6C26BDB0 0129EB67 F925298E 6945B71E CE00B2F6");
     printf("SM3 hash           : "); for(int i=0; i<32; i++) {printf("%02x", hash_sm3[i]); if(i%4==3) putchar(' ');}; putchar('\n');
+
+
+    // XTS_AES128
+    unsigned char pt_xts[32] = {0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44,
+                                0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44};
+    unsigned char ct_xts[33]={0};
+    unsigned char ct_ref_xts[33]={0xaf, 0x85, 0x33, 0x6b, 0x59, 0x7a, 0xfc, 0x1a, 0x90, 0x0b, 0x2e, 0xb2, 0x1e, 0xc9, 0x49, 0xd2,
+                                  0x92, 0xdf, 0x4c, 0x04, 0x7e, 0x0b, 0x21, 0x53, 0x21, 0x86, 0xa5, 0x97, 0x1a, 0x22, 0x7a, 0x89, '\0'};
+    unsigned char dt_xts[32]={0};
+    uint8_t key_xts[32] = {0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+                           0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22};
+    uint64_t seq_num = 0x3333333333;
+    size_t msg_size = 32;
+    
+    XTS_AES128_Encrypt_naive(pt_xts, msg_size, seq_num, key_xts, ct_xts);
+    XTS_AES128_Decrypt_naive(ct_xts, msg_size, seq_num, key_xts, dt_xts);
+    printf("\n[XTS-AES128-naive]: \n");
+    printf("timing(ms): %.9lf\n", lapse_sm3);
+    printf("plaintext: "); for(size_t i=0;i<msg_size;i++) printf("%02x ", pt_xts[i]); putchar('\n');
+    printf("ciphertext: "); for(size_t i=0;i<msg_size;i++) printf("%02x ", ct_xts[i]); putchar('\n');
+    printf("EncryptoCheck: %s\n", strcmp((char*)ct_xts, (char*)ct_ref_xts)?"Fail":"Pass");
+    printf("deciphertext: "); for(size_t i=0;i<msg_size;i++) printf("%02x ", dt_xts[i]); putchar('\n');
 
     return 0;
 }
