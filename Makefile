@@ -9,7 +9,7 @@ SOURCES := $(wildcard $(SRCDIR)/*.c)
 OBJECTS := $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
 
 
-all: $(BINDIR)/main
+all: $(BINDIR)/main $(BINDIR)/test
 
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
@@ -17,6 +17,9 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.c
 
 
 $(BINDIR)/main: main.cpp $(OBJECTS) 
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BINDIR)/test: test.cpp $(OBJECTS) 
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 
